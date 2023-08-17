@@ -1,116 +1,77 @@
-const socket = io.connect();
+document.addEventListener('DOMContentLoaded', () => {
+    const socket = io.connect();
 
-socket.on('connect', () => {
-    console.log('Socket connected');
-});
-
-// socket.on('message', (data) => {
-//     console.log('Received message:', data);
-//     const messagesDiv = document.getElementById('chat-messages');
-//     const newMessage = document.createElement('div');
-//     newMessage.className = data.sender_username === '{{ username }}' ? 'my-message' : 'other-message';
-//     newMessage.innerHTML = `<strong>${data.sender_username}: </strong>${data.message}`;
-//     messagesDiv.appendChild(newMessage);
-// });
-socket.on('message', (data) => {
-    console.log('Received message:', data);
-
-    // Update the chat messages in the UI
-    const messagesDiv = document.getElementById('chat-messages');
-    // messagesDiv.innerHTML = ''; // Clear existing messages
-    
-    data.messages.forEach(message => {
-        const messageDiv = document.createElement('div');
-        const senderLabel = message.sender_contact === '{{ contact }}' ? 'You' : message.sender_username;
-        messageDiv.innerHTML = `<strong>${senderLabel}: </strong>${message.message}`;
-        messagesDiv.appendChild(messageDiv);
+    socket.on('connect', () => {
+        console.log('Socket connected');
     });
-});
 
+    socket.on('message', data => {
+        console.log('Received message:', data);
 
-// Event listener for sending messages when the form is submitted
-document.getElementById('message-form').addEventListener('submit', function (event) {
-    event.preventDefault();
-    
-    console.log('Sending message...');
-    const receiverContact = document.getElementById('connected-username').textContent;
+        displayMessage(data.sender_contact, data.sender_username, data.message);
+    });
+
     const messageInput = document.getElementById('message-input');
-    const message = messageInput.value.trim();
-
-    if (message !== '') {
-        socket.emit('message', {
-            sender_contact: '{{ contact }}',
-            receiver_contact: receiverContact,
-            message: message
-        });
-            // Fetch and display updated chat history after sending a message
+    const sendButton = document.getElementById('send-button');
+    const connectForm = document.getElementById('connect-form');
+    const connectedUsernameElement = document.getElementById('connected-username');
+    
+    connectForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const receiverContact = document.getElementById('receiver_contact').value.trim();
+        
+        if (receiverContact !== '') {
+            connectedUsernameElement.textContent = receiverContact;
             fetch(`/get_chat_history?receiver_contact=${receiverContact}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const chatMessagesDiv = document.getElementById('chat-messages');
-                    chatMessagesDiv.innerHTML = ''; // Clear existing messages
-
-                    data.messages.forEach(message => {
-                        const messageDiv = document.createElement('div');
-                        const senderLabel = message.sender_contact === '{{ contact }}' ? 'You' : message.sender_username;
-                        messageDiv.innerHTML = `<strong>${senderLabel}: </strong>${message.message}`;
-                        chatMessagesDiv.appendChild(messageDiv);
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching chat history:', error);
-            });
-        messageInput.value = '';
-    }
-});
-
-document.getElementById('connect-form').addEventListener('submit', function (event) {
-    event.preventDefault();
-
-    const connectContactInput = document.getElementById('receiver_contact');
-    const connectContact = connectContactInput.value.trim();
-
-    if (connectContact !== '') {
-        // Fetch the connected user's username from the server
-        fetch(`/user_exists?contact=${connectContact}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.exists) {
-                    const connectedUsername = data.username;
-                    const connectedUsernameElement = document.getElementById('connected-username');
-                    connectedUsernameElement.textContent = connectedUsername;
-
-                    // Set the receiver_contact for sending messages
-                    const sendButton = document.getElementById('send-button');
-                    sendButton.setAttribute('data-receiver-contact', connectContact);
-
-                    // Fetch and display chat history for the connected user
-                    fetch(`/get_chat_history?receiver_contact=${connectContact}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                const chatMessagesDiv = document.getElementById('chat-messages');
-                                chatMessagesDiv.innerHTML = ''; // Clear existing messages
-
-                                data.messages.forEach(message => {
-                                    const messageDiv = document.createElement('div');
-                                    const senderLabel = message.sender_contact === '{{ contact }}' ? 'You' : message.sender_username;
-                                    messageDiv.innerHTML = `<strong>${senderLabel}: </strong>${message.message}`;
-                                    chatMessagesDiv.appendChild(messageDiv);
-                                });
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error fetching chat history:', error);
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        clearChatMessages();
+                        data.messages.forEach(message => {
+                            displayMessage(message.sender_contact, message.sender_username, message.message);
                         });
-                } else {
-                    console.log('User not found');
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching username:', error);
-            });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching chat history:', error);
+                });
+        }
+    });
+
+    sendButton.addEventListener('click', () => {
+        const receiverContact = connectedUsernameElement.textContent;
+        const message = messageInput.value.trim();
+
+        if (message !== '') {
+            sendMessage('{{ contact }}', receiverContact, '{{ username }}', message);
+            messageInput.value = '';
+        }
+    });
+
+    function sendMessage(senderContact, receiverContact, senderUsername, message) {
+        const data = {
+            sender_contact: senderContact,
+            receiver_contact: receiverContact,
+            sender_username: senderUsername,
+            message: message
+        };
+
+        socket.emit('message', data); // Send the message to the server
+        displayMessage(senderContact, senderUsername, message);
+    }
+
+    function displayMessage(contact, username, message) {
+        const messagesDiv = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        
+        const senderLabel = contact === '{{ contact }}' ? 'You' : username;
+        messageDiv.innerHTML = `<strong>${senderLabel}: </strong>${message}`;
+        
+        messagesDiv.appendChild(messageDiv);
+    }
+
+    function clearChatMessages() {
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.innerHTML = '';
     }
 });

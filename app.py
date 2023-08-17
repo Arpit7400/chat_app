@@ -11,4 +11,4 @@ app.secret_key = 'your_secret_key_here'  # Replace with a secure secret key
 app = configure_routes(app, socketio)
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True,port=3001)
